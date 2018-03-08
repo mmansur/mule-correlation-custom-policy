@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<policy xmlns="http://www.mulesoft.org/schema/mule/policy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:spring="http://www.springframework.org/schema/beans"
+        xmlns:mule="http://www.mulesoft.org/schema/mule/core"
+        xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+        xmlns:ss="http://www.springframework.org/schema/security"
+        xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+        xmlns:api-platform-gw="http://www.mulesoft.org/schema/mule/api-platform-gw"
+        xsi:schemaLocation="http://www.mulesoft.org/schema/mule/policy http://www.mulesoft.org/schema/mule/policy/current/mule-policy.xsd
+              http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+              http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd
+              http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-current.xsd
+              http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+              http://www.mulesoft.org/schema/mule/api-platform-gw http://www.mulesoft.org/schema/mule/api-platform-gw/current/mule-api-platform-gw.xsd
+              http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <!--
+        This is a custom policy example to help you get started.
+        It's a policy that filters HTTP requests based on a MEL expression.
+
+        The policy has two configuration parameters (see the YAML file):
+        - query: a MEL expression to determine which messages to filter.
+        - denied-message: a message to display in the response when the
+          filter is applied.
+
+        For more information about creating custom policies see:
+        https://docs.mulesoft.com/api-manager/creating-a-policy-walkthrough
+        and
+        https://docs.mulesoft.com/api-manager/applying-custom-policies
+    -->
+
+    <!--
+        A pointcut controls the scope of a policy application. You can use
+        different types of conditions to determine if the policy must be
+        applied.
+
+        api-platform-gw:api-pointcut: Applies the policy to a particular API.
+        apiName/apiVersion values are compared against the auto-discovery
+        global element defined in your Mule project.
+        See: https://docs.mulesoft.com/api-manager/api-auto-discovery
+
+        For other kinds of pointcut conditions see:
+        https://docs.mulesoft.com/api-manager/applying-custom-policies
+    -->
+    <pointcut>
+        <!--
+            This file is a policy template, in the final XML deployed to Mule
+            the names surrounded by double bracket will be replaced with
+            configuration parameters.
+        -->
+        <api-platform-gw:api-pointcut apiName="{{ apiName }}" apiVersion="{{ apiVersionName }}"/>
+    </pointcut>
+
+
+	<mule:processor-chain xmlns:mule="http://www.mulesoft.org/schema/mule/core" name="authorizationHeaderViolation">
+	      <mule:set-property propertyName="http.status" value="403"/>
+	      <mule:set-property propertyName="Content-Type" value="application/json"/>
+
+	</mule:processor-chain>
+    <!--
+        The before tag executes before your API flows. In this tag you can
+        filter or manipulate the incoming message.
+    -->
+    <before>
+      <mule:set-variable variableName="prefix" value="{{ ALC-ID-Prefix }}"  />
+      <mule:set-variable variableName="var_alc_corId" value="#[message.inboundProperties.'alc-correlation' != empty ? message.inboundProperties.'alc-correlation': prefix.concat(java.util.UUID.randomUUID())]" />
+      <mule:logger message="BeforeVar: #[var_alc_corId]" level="INFO" />
+      <mule:logger message="#[var_alc_corId]" level="INFO" />
+      <mule:logger message="#[prefix]" level="INFO" />
+      <mule:logger message="BeforeEmpty: #[(message.inboundProperties.'alc-correlation' != empty)]" level="INFO" />
+      <mule:logger message="BeforeValue: #[message.inboundProperties.'alc-correlation']" level="INFO" />
+      <mule:async>
+        <tracking:custom-event event-name="CustomBusinessEvent" >
+            <tracking:meta-data key="alc-correlation" value="#[var_alc_corId]"/>
+            <tracking:meta-data key="Method:Path" value="#[message.inboundProperties.'http.method']:#[message.inboundProperties.'http.request.path']"/>
+        </tracking:custom-event>
+      </mule:async>
+      <mule:set-property propertyName="alc-correlation" value="#[var_alc_corId]" />
+
+        <!--
+            When a message fails to satisfy the conditions specified by a
+            filter, that filter returns a null value, which causes the
+            processing of that particular message to halt. In other words,
+            the message is rejected and undergoes no further processing.
+
+            See: https://docs.mulesoft.com/mule-user-guide/v/3.8/filters
+        -->
+
+    </before>
+
+    <!--
+        The after is inserted after your API flows. With this tag you can
+        manipulate the API response.
+
+        Note that if the API flow is halted (ie. by a filter) the after
+        tag will not run. In this example, the after tag is not executed
+        when the message is filtered.
+    -->
+    <after>
+        <mule:logger message="AfterHeader: #[var_alc_corId]" level="INFO" />
+        <mule:set-property propertyName="alc-correlation" value="#[var_alc_corId]" />
+    </after>
+
+    <mule:processor-chain name="policyViolation">
+        <mule:logger message="The custom policy filtered the message #[message.getId()] based on a MEL query" level="DEBUG" />
+        <mule:set-property propertyName="http.status" value="403"/>
+        <mule:set-property propertyName="Content-Type" value="application/json"/>
+        <mule:set-payload value='{ "error" : "Custom Policy: {{ denied-message }}"}'/>
+    </mule:processor-chain>
+</policy>

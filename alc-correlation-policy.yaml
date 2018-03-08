@@ -1,0 +1,38 @@
+#
+# This is an example of a Custom Policy Definition file.
+# This file is used by API Platform to:
+# - Auto-generate a configuration UI for your custom policy.
+# - Determine policy dependencies
+#
+# See: https://docs.mulesoft.com/api-manager/applying-custom-policies#policy-definition
+
+# Name used to describe the policy in API Platform
+name: ALC CorrelationID Insight
+
+# A more detailed description of the policy
+description: A policy that implemets a CorrelationID in the custom http header alc-correlation. This enables API Network level trackability and insight through creation of a business event with a configurable Prefix which then can be sent to Splunk.
+
+# Category is just a plain text used in API Platform to list policies
+category: Logging
+
+# True if the policy can work on its own or false if the policy can be
+# applied only as part of another policy.
+standalone: true
+
+requiresConnectivity: false
+
+# A list of strings that describes characteristics provided by this policy.
+# API Platform uses an indirect dependency mechanisms: policies can provide
+# or require characteristics, the platform will inform you about requirements
+# but it will not force you to use a particular policy
+providedCharacteristics: [ALC Level Process Insight]
+requiredCharacteristics: []
+
+# This defines custom configuration parameters for your policy template
+configuration:
+  - propertyName: ALC-ID-Prefix
+    name: ALC CorrelationID Prefix
+    description: Api Led Connectivity CorrelationID (ALC-CorrelationID) prefix
+    type: string
+    optional: true
+    defaultValue: "ALC-ID-"
